@@ -1,1 +1,3 @@
-# dark-theme-app-name-generator-128235
+# Project Repository
+
+This is the initial README file for the project.
