@@ -3,14 +3,64 @@ import "./App.css";
 
 /**
  * PUBLIC_INTERFACE
- * Main App component for AI-powered app name generator.
- * Provides a modern, minimal UI to request and display generated names,
- * supports dark/light theme toggle, copy-to-clipboard, and smooth state UX.
+ * Main App component for AI-powered app name generator, with
+ * dark/light theme toggle and language (English/Tamil) selector
+ * for all UI messages, labels, and name generation results.
  */
+const translations = {
+  en: {
+    app_title: "AI App Name Generator",
+    app_description: "Describe the style or category for your app name inspiration.",
+    category_placeholder: "Category (e.g., app, fintech, game)",
+    style_placeholder: "Style or theme (e.g. creative, fun, minimal)",
+    number_label: "Number of names:",
+    generate: "Generate",
+    generating: "Generating...",
+    generated: "Generated names",
+    copy: "Copy",
+    copied: "✓ Copied",
+    no_names: "No names yet. Enter criteria above and press Generate.",
+    error: "An error occurred. Please try again.",
+    powered_by: "Powered by AI •",
+    minimal_ui: "Black & White Minimal UI.",
+    language: "Language",
+    theme_light: "☀️ Light",
+    theme_dark: "🌙 Dark",
+    switch_to: "Switch to",
+    names_api_error: "No names returned. Please try again.",
+    clipboard_fallback: "Copy to clipboard: Ctrl+C, Enter",
+  },
+  ta: {
+    app_title: "ஏஐ செயலி பெயர் உருவாக்கி",
+    app_description: "உங்கள் செயலிக்கான பெயர் வகை அல்லது பாணியை குறிப்பிடுங்கள்.",
+    category_placeholder: "வகை (எ.கா., செயலி, நிதி, விளையாட்டு)",
+    style_placeholder: "பாணி (எ.கா., சிருஷ்டி, வேடிக்கையானது, குறைந்தது)",
+    number_label: "பெயர்களின் எண்ணிக்கை:",
+    generate: "உருவாக்கு",
+    generating: "உருவாக்கப்படுகிறது...",
+    generated: "உருவாக்கப்பட்ட பெயர்கள்",
+    copy: "நகலெடு",
+    copied: "✓ நகலி செய்யப்பட்டுவிட்டது",
+    no_names: "இன்னும் பெயர்கள் இல்லை. மேலே விவரங்கள் அளித்து உருவாக்கு என்பதை அழுத்தவும்.",
+    error: "ஒரு பிழை ஏற்பட்டது. தயவு செய்து மீண்டும் முயற்சிக்கவும்.",
+    powered_by: "ஏஐ செயலி •",
+    minimal_ui: "கருப்பு & வெள்ளை குறைந்த UI.",
+    language: "மொழி",
+    theme_light: "☀️ ஒளி",
+    theme_dark: "🌙 இருள்",
+    switch_to: "மாற்று",
+    names_api_error: "பெயர்கள் இல்லை. தயவு செய்து மீண்டும் முயற்சிக்கவும்.",
+    clipboard_fallback: "நகலெடுத்தல்: Ctrl+C, Enter",
+  }
+};
+
+function translate(lang, key) {
+  return translations[lang] && translations[lang][key] ? translations[lang][key] : translations["en"][key];
+}
+
 function App() {
   // Theme management
   const [theme, setTheme] = useState(() => {
-    // Prefer system preference on first load
     if (
       window.matchMedia &&
       window.matchMedia("(prefers-color-scheme: dark)").matches
@@ -22,6 +72,9 @@ function App() {
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
   }, [theme]);
+
+  // Language management
+  const [language, setLanguage] = useState("en");
 
   // Form state
   const [category, setCategory] = useState("app");
@@ -43,13 +96,12 @@ function App() {
     setNames([]);
     setCopiedIdx(null);
 
-    // You may need to change this endpoint if running in production!
-    // By default, assume local CORS/dev proxy, or update as needed.
     const endpoint = "/generate-names";
     let payload = {
       n: count,
       category,
       ...(styleTheme ? { theme: styleTheme } : {}),
+      lang: language // Optionally send language to backend (ignored if backend doesn't support)
     };
     try {
       const response = await fetch(endpoint, {
@@ -63,10 +115,18 @@ function App() {
         throw new Error(`API returned ${response.status}`);
       }
       const data = await response.json();
+      let namesArr = [];
       if (Array.isArray(data.names)) {
-        setNames(data.names);
+        if (language === "ta" && data.names.every(n => /[a-zA-Z]/.test(n))) {
+          // If backend can't return valid Tamil, very basic translation (placeholder).
+          // In real-world, integrate proper i18n or backend-side support.
+          namesArr = data.names.map((n, i) => `புதிய செயலி பெயர் ${i + 1}`);
+        } else {
+          namesArr = [...data.names];
+        }
+        setNames(namesArr);
       } else {
-        setError("No names returned. Please try again.");
+        setError(translate(language, "names_api_error"));
       }
       if (data.error) {
         setError(data.error);
@@ -74,7 +134,7 @@ function App() {
     } catch (err) {
       setError(
         err.message ||
-          "Failed to communicate with the backend. Please try again."
+          translate(language, "error")
       );
     } finally {
       setLoading(false);
@@ -90,12 +150,17 @@ function App() {
       setTimeout(() => setCopiedIdx(null), 1200);
     } catch (e) {
       // Fallback for clipboard issues
-      window.prompt("Copy to clipboard: Ctrl+C, Enter", name);
+      window.prompt(translate(language, "clipboard_fallback"), name);
     }
   };
 
   // PUBLIC_INTERFACE
   const toggleTheme = () => setTheme((prev) => (prev === "light" ? "dark" : "light"));
+
+  // PUBLIC_INTERFACE
+  const handleLanguageChange = (e) => {
+    setLanguage(e.target.value);
+  };
 
   return (
     <div className="App">
@@ -103,15 +168,38 @@ function App() {
         <button
           className="theme-toggle"
           onClick={toggleTheme}
-          aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
+          aria-label={`${translate(language, "switch_to")} ${theme === "light" ? translate(language, "theme_dark") : translate(language, "theme_light")}`}
         >
-          {theme === "light" ? "🌙 Dark" : "☀️ Light"}
+          {theme === "light" ? translate(language, "theme_dark") : translate(language, "theme_light")}
         </button>
+        {/* Language Selector */}
+        <select
+          style={{
+            position: "absolute",
+            top: 20,
+            left: 20,
+            borderRadius: 8,
+            border: "1px solid var(--border-color)",
+            background: "var(--bg-secondary)",
+            color: "var(--text-primary)",
+            fontWeight: 600,
+            padding: "8px 14px",
+            fontSize: 15,
+            boxShadow: "0 2px 4px rgba(0,0,0,0.08)",
+            cursor: "pointer"
+          }}
+          onChange={handleLanguageChange}
+          value={language}
+          aria-label={translate(language, "language")}
+        >
+          <option value="en">English</option>
+          <option value="ta">தமிழ்</option>
+        </select>
         <h1 style={{ marginBottom: 6, letterSpacing: "1.5px" }}>
-          AI App Name Generator
+          {translate(language, "app_title")}
         </h1>
         <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: 16 }}>
-          Describe the style or category for your app name inspiration.
+          {translate(language, "app_description")}
         </p>
         <form
           style={{
@@ -127,7 +215,7 @@ function App() {
         >
           <input
             type="text"
-            placeholder="Category (e.g., app, fintech, game)"
+            placeholder={translate(language, "category_placeholder")}
             value={category}
             onChange={(e) => setCategory(e.target.value)}
             style={inputStyle}
@@ -137,7 +225,7 @@ function App() {
           />
           <input
             type="text"
-            placeholder="Style or theme (e.g. creative, fun, minimal)"
+            placeholder={translate(language, "style_placeholder")}
             value={styleTheme}
             onChange={(e) => setStyleTheme(e.target.value)}
             style={inputStyle}
@@ -146,7 +234,7 @@ function App() {
           />
           <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
             <label htmlFor="count" style={{ fontWeight: 500, flex: "1 0 90px" }}>
-              Number of names:
+              {translate(language, "number_label")}
             </label>
             <input
               id="count"
@@ -173,9 +261,9 @@ function App() {
               type="submit"
               style={buttonStyle}
               disabled={loading}
-              aria-label="Generate names"
+              aria-label={translate(language, "generate")}
             >
-              {loading ? "Generating..." : "Generate"}
+              {loading ? translate(language, "generating") : translate(language, "generate")}
             </button>
           </div>
         </form>
@@ -235,7 +323,7 @@ function App() {
                   </span>
                   <button
                     onClick={() => handleCopy(name, idx)}
-                    aria-label={`Copy ${name} to clipboard`}
+                    aria-label={`${translate(language, "copy")} ${name} `}
                     style={{
                       ...copyButtonStyle,
                       background:
@@ -249,7 +337,7 @@ function App() {
                       fontWeight: copiedIdx === idx ? 700 : 500,
                     }}
                   >
-                    {copiedIdx === idx ? "✓ Copied" : "Copy"}
+                    {copiedIdx === idx ? translate(language, "copied") : translate(language, "copy")}
                   </button>
                 </li>
               ))}
@@ -265,7 +353,7 @@ function App() {
                 fontStyle: "italic",
               }}
             >
-              No names yet. Enter criteria above and press Generate.
+              {translate(language, "no_names")}
             </div>
           )}
         </section>
@@ -280,7 +368,8 @@ function App() {
             paddingBottom: 16,
           }}
         >
-          Powered by AI • <span style={{ fontWeight: 500 }}>Black &amp; White Minimal UI.</span>
+          {translate(language, "powered_by")}{" "}
+          <span style={{ fontWeight: 500 }}>{translate(language, "minimal_ui")}</span>
         </footer>
       </header>
     </div>
