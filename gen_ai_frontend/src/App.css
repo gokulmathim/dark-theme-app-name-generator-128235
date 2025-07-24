@@ -29,16 +29,7 @@
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
-}
+/* Remove .App-logo and related styles (logo not used in minimal UI) */
 
 .App-header {
   background-color: var(--bg-secondary);
